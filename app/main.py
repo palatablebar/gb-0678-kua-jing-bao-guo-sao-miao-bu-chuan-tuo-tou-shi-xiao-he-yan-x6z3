@@ -1,5 +1,5 @@
 from flask import Flask,jsonify,request,send_from_directory
-from app.config import ROOT,DATA_DIR,MODULES
+from app.config import ROOT,DATA_DIR,MODULES,VERSION_REQUEST_OPTIONS
 from app.errors import DomainError
 from app import pipeline,store
 from app.web import register_pages
@@ -25,16 +25,35 @@ def create_app():
         if not isinstance(params,dict): raise DomainError("BAD_PARAMETERS","参数需要对象")
         raw=payload.get("csv")
         if raw is not None and not isinstance(raw,str): raise DomainError("BAD_CSV","CSV需要文本")
+        version=params.get("version","auto")
+        if version not in VERSION_REQUEST_OPTIONS: raise DomainError("BAD_VERSION","版本参数只能是 auto、v1 或 v2")
         return pipeline.execute(raw.encode() if raw is not None else pipeline.load_sample(payload.get("sample","dirty.csv")),params)
     @application.post("/api/upload")
     def upload():
         file=request.files.get("file")
         if not file: raise DomainError("NO_FILE","请选择CSV文件")
-        return pipeline.execute(file.read())
+        version=request.form.get("version","auto")
+        if version not in VERSION_REQUEST_OPTIONS: raise DomainError("BAD_VERSION","版本参数只能是 auto、v1 或 v2")
+        params={} if version=="auto" else {"version":version}
+        return pipeline.execute(file.read(),params)
     @application.get("/api/runs")
     def history(): return {"runs":store.history()}
     @application.get("/api/runs/<run_id>")
     def run_detail(run_id): return store.get(run_id)
+    @application.get("/api/runs/<run_id>/events")
+    def run_events(run_id): return {"events":store.events(run_id)}
+    @application.get("/api/runs/<run_id>/raws")
+    def run_raws(run_id): return {"raws":store.raws(run_id)}
+    @application.get("/api/runs/<run_id>/raws/<sha256>")
+    def run_raw_by_sha(run_id,sha256):
+        if sha256 not in {item["sha256"] for item in store.raws(run_id)}: raise DomainError("NOT_FOUND","原始扫描不属于该批次",404)
+        return application.response_class(store.raw_input(sha256),mimetype="text/csv",headers={"Content-Disposition":'attachment; filename="raw-scans.csv"'})
+    @application.get("/api/runs/<run_id>/raw")
+    def run_raw(run_id):
+        sha,raw=store.raw_for_run(run_id)
+        response=application.response_class(raw,mimetype="text/csv",headers={"Content-Disposition":'attachment; filename="raw-scans.csv"'})
+        response.headers["X-Raw-Sha256"]=sha
+        return response
     @application.post("/api/runs/<run_id>/review")
     def review(run_id):
         p=request.get_json(silent=True) or {}

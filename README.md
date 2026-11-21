@@ -21,6 +21,8 @@ docker compose exec -T app pytest -q
 - 6. 赔付对账：`/compensation`，`/api/compensation`。
 - 7. 批次归档：`/archives`，`/api/archives`。
 
+整窗版本裁决在`app/versioning.py`：一个窗口只采用一个版本，逐票只记录适用依据。
+
 ## 核心规则
 
 以事件发生时刻重建路径，补传不改变既有妥投时间；承诺时钟按目的地节假日停表。
@@ -29,14 +31,14 @@ docker compose exec -T app pytest -q
 
 1. 打开首页，核对当次计算、差异和隔离原因。
 2. 切换模块查看源行及裁决依据。
-3. 重跑相同样例，批次号与行数保持一致。
+3. 重跑相同样例，批次号与行数保持一致。版本选择支持自动/旧版/新版；新版切换失败会恢复旧版批次。
 4. 复核后导出一份证据CSV。版本已变化的复核提交返回409。
 
 ## 输入与输出
 
-输入列见 `docs/DATA-DICTIONARY.md`。项目包含dirty.csv、clean.csv、legacy.csv，统一走实际导入路径。上传限制4MB，拒绝不带时区的时间。业务键按字符串保留，Decimal参与计算，空值不会当零。
+输入列见 `docs/DATA-DICTIONARY.md`。项目包含dirty.csv、clean.csv、legacy.csv，以及升级样例upgrade.csv（部分复核标记）与reviewed.csv（全部复核标记），统一走实际导入路径。上传限制4MB，拒绝不带时区的时间。业务键按字符串保留，Decimal参与计算，空值不会当零。
 
-`POST /api/runs` 接收sample或csv；`GET /api/runs`返回历史批次；`POST /api/runs/<id>/review`需要version与decision；`GET /api/runs/<id>/archive`返回唯一证据导出。
+`POST /api/runs` 接收sample或csv与parameters.version（auto/v1/v2）；`GET /api/runs`返回历史批次；`POST /api/runs/<id>/review`需要version与decision；`GET /api/runs/<id>/archive`返回唯一证据导出；`/api/runs/<id>/raws`与`/api/runs/<id>/raw`取原始扫描，`/api/runs/<id>/events`看批次事件。
 
 ## 范围
 

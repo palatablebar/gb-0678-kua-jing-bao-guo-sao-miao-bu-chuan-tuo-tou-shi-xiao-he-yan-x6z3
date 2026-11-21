@@ -32,10 +32,14 @@
 | TRAP-12 | DST自然日 | 固定24小时 | 按当地午夜切片 | `app/modules/m5_timeliness/rules.py` | `tests/test_m5.py::test_dst_actual_elapsed_hours` |
 | TRAP-13 | 迟到妥投补传 | 按上传时间赔付 | 发生时间重建 | `app/modules/m4_paths/rules.py` | `tests/test_m4.py::test_late_upload_event_time_decides` |
 | TRAP-23 | 假日端点 | 误算全天 | 当地日半开切段 | `app/modules/m5_timeliness/rules.py` | `tests/test_m5.py::test_holiday_full_day_stops` |
+| TRAP-27 | 升级后混有新老记录 | 逐票套新版判缺标记 | 整窗唯一版本，逐票只记依据 | `app/versioning.py`、`app/modules/m1_scans/rules.py` | `tests/test_versioning.py::test_partial_marks_fall_back_as_whole_window` |
+| TRAP-28 | 新版切换失败 | 留下半成品批次 | 恢复旧版批次，重试不新增 | `app/store.py` | `tests/test_versioning.py::test_failed_switch_keeps_old_batch` |
+| TRAP-29 | 版本重试 | 每次上传新建批次 | 请求版本不计入批次身份 | `app/manifest.py`、`app/store.py` | `tests/test_versioning.py::test_retry_does_not_create_new_batch` |
+| TRAP-30 | 原始扫描丢失 | 回退覆盖原文 | 原文按摘要只增不删 | `app/store.py` | `tests/test_versioning.py::test_raw_scan_survives_attempts_and_is_first_seen` |
 
 ## 对账规则
 
-输入原始逻辑行=最终采纳来源行+隔离来源行+重复行+空白行+分段表头。派生记录用_sources保存完整来源，因此分组不丢行。业务预期合计与上游申报合计之差等于逐行差异之和。结果按输入摘要、规则版本及参数产生唯一批次，事务写入；同源重跑只复用已有批次。
+输入原始逻辑行=最终采纳来源行+隔离来源行+重复行+空白行+分段表头。派生记录用_sources保存完整来源，因此分组不丢行。业务预期合计与上游申报合计之差等于逐行差异之和。结果按窗口业务内容、规则版本及参数产生唯一批次，事务写入；同源重跑只复用已有批次，请求版本与复核标记列不计入批次身份，因此同一窗口切版本仍是同一份正式批次。整窗只裁决一个版本，逐票仅存档适用依据。
 
 ## 已知不覆盖
 
